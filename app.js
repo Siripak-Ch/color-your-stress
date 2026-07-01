@@ -95,6 +95,8 @@ let uploadedImageForCardId = '';
 let apiCache = { wall: { ts: 0, data: [] }, prize: { ts: 0, data: null } };
 let inFlight = {};
 let prizeAutoTimer = null;
+let gachaInProgress = false;
+let gachaCompleted = false;
 
 window.addEventListener('DOMContentLoaded', () => {
   // Boot each section separately so one UI issue never leaves the Quiz blank.
@@ -519,6 +521,13 @@ function makeLocalCard(payload, boardImage, localPending = false) {
 
 function openEvaluationModal() {
   if (!preparedPayload) return showToast('กรุณาส่ง Mood Board ก่อนค่ะ');
+  const stored = getStoredSpinResult();
+  if (gachaCompleted || stored) {
+    if (stored) renderSpinResult(stored, { fromStored: true });
+    else if (lastSpinResponse) renderSpinResult(lastSpinResponse, { fromStored: true });
+    disableSpinButton('หมุนแล้ว');
+    return showToast('คุณหมุน Gacha แล้ว 1 ครั้ง');
+  }
   document.getElementById('evaluationModal').classList.remove('hidden');
 }
 function closeEvaluationModal() { document.getElementById('evaluationModal').classList.add('hidden'); }
@@ -547,13 +556,23 @@ function startSpin(payload) {
   const resultBox = document.getElementById('spinResult');
   if (!payload) return showToast('ไม่พบข้อมูลสำหรับหมุน Gacha');
 
-  const spinPayload = buildSpinPayload(payload);
-  if (spinBtn) {
-    spinBtn.disabled = true;
-    spinBtn.textContent = 'กำลังสุ่ม...';
+  const stored = getStoredSpinResult();
+  if (gachaCompleted || stored) {
+    if (stored) renderSpinResult(stored, { fromStored: true });
+    else if (lastSpinResponse) renderSpinResult(lastSpinResponse, { fromStored: true });
+    disableSpinButton('หมุนแล้ว');
+    return;
   }
+  if (gachaInProgress) return showToast('ระบบกำลังสุ่มรางวัลอยู่ กรุณารอสักครู่');
+
+  const spinPayload = buildSpinPayload(payload);
+  gachaInProgress = true;
+  disableSpinButton('กำลังสุ่ม...');
+  showLoading('กำลังสุ่มรางวัล', 'กรุณารอสักครู่ ระบบกำลังล็อกรางวัลของคุณ 1 ครั้งต่อคน');
+
   if (resultBox) {
-    resultBox.innerHTML = '<strong>กำลังสุ่มรางวัล...</strong><small>รอสักครู่ ระบบกำลังล็อกรางวัลจาก PrizePool</small>';
+    resultBox.classList.add('loading');
+    resultBox.innerHTML = '<strong>กำลังสุ่มรางวัล...</strong><small>รอสักครู่ ระบบกำลังเลือกจาก PrizePool</small>';
   }
 
   const finalRotation = 720 + Math.floor(Math.random() * 360);
@@ -562,46 +581,88 @@ function startSpin(payload) {
     wheel.style.transition = 'none';
     wheel.style.transform = 'rotate(0deg)';
     requestAnimationFrame(() => {
-      wheel.style.transition = 'transform .55s cubic-bezier(.16,.9,.18,1)';
+      wheel.style.transition = 'transform .65s cubic-bezier(.16,.9,.18,1)';
       wheel.style.transform = `rotate(${finalRotation}deg)`;
     });
   }
 
-  // Fast path: only send small payload to Apps Script. No board image / no layout JSON here.
   const startedAt = Date.now();
   api('submitAndSpin', spinPayload, { timeout: 12000 }).then(res => {
     if (!res || !res.ok) throw new Error((res && res.message) || 'ไม่สามารถสุ่มรางวัลได้');
-    lastSpinResponse = res;
-    if (res.cardId) {
-      preparedPayload.cardId = res.cardId;
-      spinPayload.cardId = res.cardId;
+    lastSpinResponse = enrichSpinResponseWithUser(res, spinPayload);
+    gachaCompleted = true;
+    storeSpinResult(lastSpinResponse);
+    if (lastSpinResponse.cardId) {
+      preparedPayload.cardId = lastSpinResponse.cardId;
+      spinPayload.cardId = lastSpinResponse.cardId;
     }
-    if (res.prizeStatus) {
-      apiCache.prize = { ts: Date.now(), data: res.prizeStatus };
-      renderPrizeStatus(res.prizeStatus);
+    if (lastSpinResponse.prizeStatus) {
+      apiCache.prize = { ts: Date.now(), data: lastSpinResponse.prizeStatus };
+      renderPrizeStatus(lastSpinResponse.prizeStatus);
     } else {
       loadPrizeStatus(false, true);
     }
     refreshWall(false, true);
-    const wait = Math.max(0, 520 - (Date.now() - startedAt));
-    setTimeout(() => renderSpinResult(res), wait);
+    const wait = Math.max(0, 650 - (Date.now() - startedAt));
+    setTimeout(() => {
+      hideLoading();
+      renderSpinResult(lastSpinResponse);
+      disableSpinButton('หมุนแล้ว');
+      if (resultBox) resultBox.classList.remove('loading');
+    }, wait);
   }).catch(err => {
     console.warn('Gacha spin error:', err);
+    hideLoading();
+    gachaCompleted = false;
     if (resultBox) {
-      resultBox.innerHTML = '<strong>เกิดข้อผิดพลาด</strong><small>กรุณากด Refresh แล้วลองใหม่ หรือเช็กว่า Apps Script URL เป็น /exec และ Deploy เป็น New version แล้ว</small>';
+      resultBox.classList.remove('loading');
+      resultBox.innerHTML = '<strong>เกิดข้อผิดพลาด</strong><small>กรุณากด Refresh แล้วลองใหม่ หรือเช็ก Apps Script URL /exec และ New version</small>';
     }
+    enableSpinButton();
     showToast(err.message || 'Gacha error');
   }).finally(() => {
-    setTimeout(() => {
-      if (wheel) wheel.classList.remove('is-spinning');
-      if (spinBtn) {
-        spinBtn.disabled = false;
-        spinBtn.textContent = 'ประเมิน + หมุนวงล้อ';
-      }
-    }, 560);
+    gachaInProgress = false;
+    setTimeout(() => { if (wheel) wheel.classList.remove('is-spinning'); }, 680);
   });
 }
 
+
+function disableSpinButton(text = 'หมุนแล้ว') {
+  const btn = document.getElementById('spinBtn');
+  if (btn) { btn.disabled = true; btn.textContent = text; btn.classList.add('disabled'); }
+}
+function enableSpinButton() {
+  const btn = document.getElementById('spinBtn');
+  if (btn) { btn.disabled = false; btn.textContent = 'ประเมิน + หมุนวงล้อ'; btn.classList.remove('disabled'); }
+}
+function currentParticipantKeyForStorage() {
+  const id = String(preparedPayload?.employeeId || document.getElementById('employeeInput')?.value || '').trim().toLowerCase();
+  return id ? `cys_gacha_result_${id.replace(/[^a-z0-9@._-]/g,'_')}` : '';
+}
+function storeSpinResult(res) {
+  try {
+    const key = currentParticipantKeyForStorage();
+    if (key && res && res.ok) localStorage.setItem(key, JSON.stringify({ ...res, storedAt: Date.now() }));
+  } catch (e) {}
+}
+function getStoredSpinResult() {
+  try {
+    const key = currentParticipantKeyForStorage();
+    if (!key) return null;
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.prize) return parsed;
+  } catch (e) {}
+  return null;
+}
+function enrichSpinResponseWithUser(res, spinPayload) {
+  return Object.assign({}, res || {}, {
+    name: res?.name || res?.participantName || spinPayload.name || '',
+    employeeId: res?.employeeId || res?.employeeID || spinPayload.employeeId || spinPayload.emailOrId || '',
+    team: res?.team || spinPayload.team || ''
+  });
+}
 function buildSpinPayload(payload) {
   const p = payload || preparedPayload || {};
   const evaluation = p.evaluation || {};
@@ -625,18 +686,20 @@ function buildSpinPayload(payload) {
     userAgent: navigator.userAgent.slice(0, 400)
   };
 }
-function renderSpinResult(res) {
+function renderSpinResult(res, options = {}) {
   const cfg = config();
   const prize = res.prize || {};
   const isGift = /gift|gacha/i.test(prize.type || '') || Number(prize.budget || 0) > 0;
   const typeLabel = isGift ? 'Gacha Gift' : 'Wellness Coupon';
   const prizeName = prize.name || typeLabel;
   const lineId = (cfg.CONTACT_LINE_ID || 'Friendly_dukdik').replace(/^friendly/i, 'Friendly');
-  const claimTitle = isGift ? '🎁 ได้รับรางวัล Gacha Gift' : '🌿 ได้รับ Wellness Coupon';
-  const claimInstruction = `ถ้าหากได้รางวัล ให้แคปหน้าจอนี้ แล้วส่งมาหาทีมงาน LINE ID: ${lineId} หรือใส่ใน Album ของ LINE Customer Experience เพื่อยืนยัน/รับรางวัล`;
+  const name = escapeHtml(res.name || res.participantName || preparedPayload?.name || document.getElementById('nameInput')?.value || '-');
+  const employeeId = escapeHtml(res.employeeId || res.employeeID || preparedPayload?.employeeId || document.getElementById('employeeInput')?.value || '-');
+  const team = escapeHtml(res.team || preparedPayload?.team || document.getElementById('teamInput')?.value || '-');
 
   const resultBox = document.getElementById('spinResult');
   if (resultBox) {
+    resultBox.classList.remove('loading');
     resultBox.innerHTML = `
       <p>${res.duplicate ? 'คุณเคยหมุนแล้ว ระบบแสดงผลเดิม' : 'ผล Wellness Gacha ของคุณคือ'}</p>
       <strong>${escapeHtml(prizeName)}</strong>
@@ -648,23 +711,25 @@ function renderSpinResult(res) {
   const content = document.getElementById('resultModalContent');
   if (modal && content) {
     content.innerHTML = `
-      <div class="result-sparkles">🌈 ✨ 🌸 ✨</div>
-      <div class="result-badge cute-result-badge">${isGift ? '🎁' : '💗'}</div>
-      <p class="eyebrow">Gacha Result</p>
-      <h2>${res.duplicate ? 'คุณเคยได้รับผลนี้แล้ว' : 'ยินดีด้วย!'}</h2>
-      <div class="result-prize-name">${escapeHtml(prizeName)}</div>
-      <p class="result-type-pill">${escapeHtml(typeLabel)}</p>
-      <div class="claim-box claim-highlight">
-        <div class="claim-title">${escapeHtml(claimTitle)}</div>
-        <div class="claim-main">📸 ${escapeHtml(claimInstruction)}</div>
-        <div class="claim-contact">
-          <span>LINE ID: <b>${escapeHtml(lineId)}</b></span>
-          <span>Album: <b>LINE Customer Experience</b></span>
+      <div class="minimal-result">
+        <div class="result-badge cute-result-badge">${isGift ? '🎁' : '💗'}</div>
+        <p class="eyebrow">Gacha Result</p>
+        <h2>${res.duplicate || options.fromStored ? 'ผลรางวัลของคุณ' : 'ยินดีด้วย!'}</h2>
+        <div class="result-prize-name minimal-prize">${escapeHtml(prizeName)}</div>
+        <p class="result-type-pill">${escapeHtml(typeLabel)}</p>
+        <div class="winner-identity">
+          <span><b>ชื่อ:</b> ${name}</span>
+          <span><b>Employee ID:</b> ${employeeId}</span>
+          <span><b>Team:</b> ${team}</span>
         </div>
-      </div>
-      <div class="button-row center result-buttons">
-        <button class="primary" onclick="closeResultModal(); goStep('stepWall')">ดู Mood Board Gallery</button>
-        <button class="ghost" onclick="closeResultModal()">ปิด</button>
+        <div class="claim-box claim-minimal">
+          <b>วิธีรับรางวัล</b>
+          <p>แคปหน้าจอนี้ แล้วส่งมาที่ <b>LINE ID: ${escapeHtml(lineId)}</b> หรือใส่ใน Album ของ <b>LINE Customer Experience</b></p>
+        </div>
+        <div class="button-row center result-buttons">
+          <button class="primary" onclick="closeResultModal(); goStep('stepWall')">ดู Mood Board Gallery</button>
+          <button class="ghost" onclick="closeResultModal()">ปิด</button>
+        </div>
       </div>`;
     modal.classList.remove('hidden');
   }
