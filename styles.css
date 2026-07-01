@@ -447,7 +447,7 @@ input:focus, textarea:focus, select:focus { border-color: #d7a7ad; box-shadow: 0
 .star-rating button.active { color: #d9851f; transform: translateY(-1px) scale(1.04); }
 .check-list, .radio-list { display: grid; gap: 8px; margin-bottom: 12px; }
 .check-list label, .radio-list label { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 8px 10px; border: 1px solid rgba(238,223,208,.72); border-radius: 16px; background: rgba(255,250,243,.74); font-weight: 800; }
-.check-list input[type="checkbox"], .radio-list input[type="radio"] { width: 18px; height: 18px; accent-color: #d86b7e; }
+.check-list input[type="checkbox"], .check-list input[type="radio"], .radio-list input[type="radio"] { width: 18px; height: 18px; accent-color: #d86b7e; }
 .other-inline { flex-wrap: wrap; }
 .other-inline input[type="text"], .other-inline input:not([type]) { flex: 1 1 180px; min-width: 150px; }
 @media (max-width: 640px) {

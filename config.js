@@ -1,5 +1,5 @@
 window.APP_CONFIG = {
-  GAS_WEBAPP_URL: 'https://script.google.com/macros/s/AKfycby-PTtX9mh2MaVGbGZdsx_3jEGzVmN0Uq-hhErDMBB2K3JR5i4iIqTh4HODPm_Slo0Eog/exec',
+  GAS_WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbw0CO6BnnLA-qNTmX_wANp9Vp-WBQYwemxymwFnb_7HCd03m-5u09d88xtUCslkNBajBg/exec',
   DEMO_MODE: false,
   REQUIRE_EMAIL: true,
   SAVE_BOARD_IMAGE_TO_DRIVE: true,

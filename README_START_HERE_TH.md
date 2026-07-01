@@ -1,8 +1,8 @@
-# Color Your Stress — V18 Gacha Once + Loading
+# Color Your Stress — V19 Gacha Once + Loading
 
 ชุดนี้แก้จาก V17 โดยเน้นส่วน Gacha ตาม feedback ล่าสุด
 
-## สิ่งที่แก้ใน V18
+## สิ่งที่แก้ใน V19
 - หมุน Gacha ได้แค่ 1 ครั้งต่อ Employee ID
 - หลังหมุนสำเร็จ ปุ่มจะถูก disable เป็น “หมุนแล้ว”
 - Backend ยังล็อกซ้ำด้วย ParticipantKey/Employee ID เหมือนเดิม
@@ -25,3 +25,9 @@
 
 ## หมายเหตุ
 ถ้ายังเห็น popup แบบเก่า ให้ตรวจว่า index.html โหลด `app.js?v=18` และ `config.js?v=18` แล้ว
+
+
+## V19 Update
+- แบบประเมินข้อ 2 เปลี่ยนจาก checkbox เป็น radio เลือกได้เพียง 1 ข้อ
+- ยังเก็บลง Sheet ในรูปแบบเดิม: `feelings` เป็น array ที่มี 1 ค่า เพื่อ compatible กับ backend เดิม
+- เพิ่ม cache busting เป็น `v=19`

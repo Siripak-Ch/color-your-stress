@@ -535,18 +535,21 @@ function setEvalOverall(score) {
   document.getElementById('evalOverall').value = String(score);
   document.querySelectorAll('#evalOverallStars button').forEach((btn, idx) => { btn.textContent = idx < score ? '★' : '☆'; btn.classList.toggle('active', idx < score); });
 }
-function getCheckedValues(containerId) { return Array.from(document.querySelectorAll(`#${containerId} input[type="checkbox"]:checked`)).map(input => input.value); }
+function getSelectedRadioValue(name) {
+  return document.querySelector(`input[name="${name}"]:checked`)?.value || '';
+}
 function submitEvaluationAndSpin() {
   if (!preparedPayload) return showToast('ไม่พบข้อมูลผลงาน กรุณากลับไปหน้า Mood Board');
   const overallRating = Number(document.getElementById('evalOverall').value || 0);
-  const feelings = getCheckedValues('evalFeelings');
+  let feeling = getSelectedRadioValue('evalFeeling');
   const other = document.getElementById('evalFeelingOther').value.trim();
-  if (feelings.includes('Other') && other) feelings[feelings.indexOf('Other')] = `Other: ${other}`;
-  const wantAgain = (document.querySelector('input[name="wantAgain"]:checked') || {}).value || '';
+  if (feeling === 'Other' && other) feeling = `Other: ${other}`;
+  const wantAgain = getSelectedRadioValue('wantAgain');
   if (!overallRating) return showToast('กรุณาให้คะแนนความพึงพอใจโดยรวม');
-  if (!feelings.length) return showToast('กรุณาเลือกความรู้สึกหลังจบกิจกรรมอย่างน้อย 1 ข้อ');
+  if (!feeling) return showToast('กรุณาเลือกความรู้สึกหลังจบกิจกรรม 1 ข้อ');
   if (!wantAgain) return showToast('กรุณาเลือกว่าต้องการให้มีกิจกรรมแบบนี้อีกหรือไม่');
-  preparedPayload.evaluation = { overallRating, feelings, wantAgain, comment: document.getElementById('evalComment').value.trim() };
+  // เก็บเป็น array 1 รายการ เพื่อให้ format ใน Sheet/Backend เดิมยัง compatible
+  preparedPayload.evaluation = { overallRating, feelings: [feeling], feeling, wantAgain, comment: document.getElementById('evalComment').value.trim() };
   closeEvaluationModal();
   startSpin(preparedPayload);
 }
