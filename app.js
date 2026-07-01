@@ -569,7 +569,7 @@ function startSpin(payload) {
 
   // Fast path: only send small payload to Apps Script. No board image / no layout JSON here.
   const startedAt = Date.now();
-  api('spinGacha', spinPayload, { timeout: 12000 }).then(res => {
+  api('submitAndSpin', spinPayload, { timeout: 12000 }).then(res => {
     if (!res || !res.ok) throw new Error((res && res.message) || 'ไม่สามารถสุ่มรางวัลได้');
     lastSpinResponse = res;
     if (res.cardId) {
@@ -631,30 +631,38 @@ function renderSpinResult(res) {
   const isGift = /gift|gacha/i.test(prize.type || '') || Number(prize.budget || 0) > 0;
   const typeLabel = isGift ? 'Gacha Gift' : 'Wellness Coupon';
   const prizeName = prize.name || typeLabel;
-  const lineId = cfg.CONTACT_LINE_ID || 'Friendly_dukdik';
-  const claimText = `กรุณาแคปหน้าจอนี้ แล้วส่งมาหาทีมงาน LINE ID: ${lineId} หรือใส่ใน Album ของ LINE Customer Experience เพื่อรับ/บันทึกรางวัล`;
+  const lineId = (cfg.CONTACT_LINE_ID || 'Friendly_dukdik').replace(/^friendly/i, 'Friendly');
+  const claimTitle = isGift ? '🎁 ได้รับรางวัล Gacha Gift' : '🌿 ได้รับ Wellness Coupon';
+  const claimInstruction = `ถ้าหากได้รางวัล ให้แคปหน้าจอนี้ แล้วส่งมาหาทีมงาน LINE ID: ${lineId} หรือใส่ใน Album ของ LINE Customer Experience เพื่อยืนยัน/รับรางวัล`;
 
-  document.getElementById('spinResult').innerHTML = `
-    <p>${res.duplicate ? 'คุณเคยหมุนแล้ว ระบบแสดงผลเดิม' : 'ผล Wellness Gacha ของคุณคือ'}</p>
-    <strong>${escapeHtml(prizeName)}</strong>
-    <small>${escapeHtml(typeLabel)}</small>
-    <button class="ghost small" onclick="goStep('stepWall')">ดู Mood Board Gallery</button>`;
+  const resultBox = document.getElementById('spinResult');
+  if (resultBox) {
+    resultBox.innerHTML = `
+      <p>${res.duplicate ? 'คุณเคยหมุนแล้ว ระบบแสดงผลเดิม' : 'ผล Wellness Gacha ของคุณคือ'}</p>
+      <strong>${escapeHtml(prizeName)}</strong>
+      <small>${escapeHtml(typeLabel)}</small>
+      <button class="ghost small" onclick="goStep('stepWall')">ดู Mood Board Gallery</button>`;
+  }
 
   const modal = document.getElementById('resultModal');
   const content = document.getElementById('resultModalContent');
   if (modal && content) {
     content.innerHTML = `
-      <div class="result-sparkles">✨ 🌈 💗</div>
+      <div class="result-sparkles">🌈 ✨ 🌸 ✨</div>
       <div class="result-badge cute-result-badge">${isGift ? '🎁' : '💗'}</div>
       <p class="eyebrow">Gacha Result</p>
-      <h2>${res.duplicate ? 'คุณเคยได้รับรางวัลนี้แล้ว' : 'ยินดีด้วย!'}</h2>
+      <h2>${res.duplicate ? 'คุณเคยได้รับผลนี้แล้ว' : 'ยินดีด้วย!'}</h2>
       <div class="result-prize-name">${escapeHtml(prizeName)}</div>
       <p class="result-type-pill">${escapeHtml(typeLabel)}</p>
-      <div class="claim-box compact-claim">
-        <strong>📸 แคปหน้าจอนี้ไว้</strong><br>
-        ${escapeHtml(claimText)}
+      <div class="claim-box claim-highlight">
+        <div class="claim-title">${escapeHtml(claimTitle)}</div>
+        <div class="claim-main">📸 ${escapeHtml(claimInstruction)}</div>
+        <div class="claim-contact">
+          <span>LINE ID: <b>${escapeHtml(lineId)}</b></span>
+          <span>Album: <b>LINE Customer Experience</b></span>
+        </div>
       </div>
-      <div class="button-row center">
+      <div class="button-row center result-buttons">
         <button class="primary" onclick="closeResultModal(); goStep('stepWall')">ดู Mood Board Gallery</button>
         <button class="ghost" onclick="closeResultModal()">ปิด</button>
       </div>`;

@@ -1,22 +1,21 @@
-# Color Your Stress — V15 Gacha Fast + Mobile Polish
+# Color Your Stress V17 — Gacha Action Fixed
 
-ชุดนี้แก้จาก V12/V14 โดยคงฟังก์ชันหลักครบ และปรับส่วน Gacha ให้ตอบเร็วขึ้น
+แก้ปัญหา `Unknown action: spinGacha` โดยตรง
 
-## สิ่งที่แก้
-- Gacha เรียก Apps Script ด้วย payload ขนาดเล็กเท่านั้น
-- ลดเวลา animation / แสดงผลรางวัล popup เร็วขึ้น
-- Popup รางวัลน่ารักขึ้น พร้อมข้อความให้แคปหน้าจอและส่ง LINE ID: Friendly_dukdik หรือ Album LINE Customer Experience
-- ไม่มี MailApp / GmailApp / sendEmail
-- แก้ Code.gs จุด duplicate const ที่ทำให้ Apps Script syntax error ได้
-- ปุ่ม Quiz ย้อนกลับ/ถัดไปใหญ่ขึ้น และอยู่ขวา/เห็นชัดบนมือถือ
-- แก้เลข tab header ให้อยู่กลางวงกลม
-- คง Mood Board / Drive save / Gallery / Like / PrizePool / Recent Gacha ครบ
+สิ่งที่แก้:
+- Frontend เปลี่ยนกลับมาเรียก action `submitAndSpin` เพื่อ compatible กับ backend รุ่นเก่า
+- Backend รองรับ alias ครบ: `spinGacha`, `submitAndSpin`, `spin`, `gacha`, `claimPrize`
+- เพิ่ม cache busting เป็น `?v=17`
+- Popup รับรางวัลยังคงข้อความให้แคปหน้าจอ + LINE ID: Friendly_dukdik / Album LINE Customer Experience
+- ไม่มีระบบส่งอีเมล
 
-## Deploy
-1. อัปไฟล์ root ไป GitHub: index.html, styles.css, app.js, config.js, .nojekyll, .github/workflows/deploy-pages.yml
-2. วาง gas-backend/Code.gs และ appsscript.json ใน Apps Script
-3. Run: setupSheets
-4. Run: authorizeServices
+วิธี deploy:
+1. Upload ไฟล์ root ทั้งหมดขึ้น GitHub
+2. วาง `gas-backend/Code.gs` ใน Apps Script
+3. Run `setupSheets`
+4. Run `authorizeServices`
 5. Deploy > Manage deployments > Edit > New version > Deploy
-6. Copy Web app URL ที่ลงท้าย /exec ไปใส่ config.js
-7. Ctrl+F5 หรือเปิด Incognito
+6. ใส่ Web App URL `/exec` ใน `config.js`
+7. เปิดเว็บแบบ Incognito หรือ Ctrl+F5
+
+ถ้ายังขึ้น error เดิม แปลว่า Apps Script ยังเป็น deployment เวอร์ชันเก่า ให้กด New version อีกครั้ง

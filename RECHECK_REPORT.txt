@@ -1,7 +1,7 @@
-V15 Recheck Report
-
-App.js syntax: PASS (node --check)
-Code.gs syntax: PASS (node --check as JS)
-Missing inline functions: []
-Mail/Gmail references active: []
-Source: V14/V12 full backend retained, gacha duplicate const fixed, gacha UI speed/mobility patched.
+V16 Recheck
+- app.js syntax: PASS
+- Code.gs syntax: PASS via JS parser copy
+- Result popup text updated: PASS
+- MailApp/GmailApp/sendEmail active calls: NONE
+- Cache busting added: app.js?v=16, config.js?v=16, styles.css?v=16
+- GitHub Pages workflow included
