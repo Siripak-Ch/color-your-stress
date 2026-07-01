@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Color Your Stress | Wellness Gacha</title>
+  <meta name="description" content="Color Your Stress: Mood Profile, Digital Mood Board, Wellness Gacha, Mood Board Gallery">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='88'%3E%F0%9F%8E%A8%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="soft-bg" aria-hidden="true"></div>
+  <div class="app-shell">
+    <header class="hero cute-card">
+      <div class="hero-copy">
+        <p class="eyebrow">ONLINE WELLNESS ACTIVITY</p>
+        <h1>Color Your Stress</h1>
+        <p class="subtitle">Mood Check + Digital Mood Board + Wellness Gacha</p>
+        <div class="status-row">
+          <div id="apiStatus" class="api-badge"><span class="api-dot live"></span><span>ระบบพร้อมใช้งาน</span></div>
+          <button class="tiny-btn" onclick="refreshAll()">Refresh</button>
+        </div>
+      </div>
+      <div class="hero-preview" aria-hidden="true">
+        <div class="preview-board">
+          <span>🌈 ✨ 🌸</span>
+          <h3>My Mood Board</h3>
+          <p>วันนี้ฉันอนุญาตให้ตัวเองพักได้</p>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <nav class="stepper cute-card" aria-label="Activity Steps">
+        <button id="navQuiz" class="step-dot active" onclick="goStep('stepQuiz')"><span>1</span>Quiz</button>
+        <button id="navDecorate" class="step-dot" onclick="guardDecorateNav()"><span>2</span>Mood Board</button>
+        <button id="navGacha" class="step-dot" onclick="guardGachaNav()"><span>3</span>Gacha</button>
+        <button id="navWall" class="step-dot" onclick="goStep('stepWall')"><span>4</span>Gallery</button>
+      </nav>
+
+      <section id="stepQuiz" class="panel step active">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Step 1</p>
+            <h2>Stress Personality Check</h2>
+            <p>ตอบ 5 ข้อสั้น ๆ เพื่อดู Mood Profile ของคุณวันนี้</p>
+          </div>
+          <span class="progress" id="quizProgress">0/5</span>
+        </div>
+        <div id="quizBox" class="quiz-box"></div>
+        <div class="button-row">
+          <button class="ghost" onclick="prevQuiz()">ย้อนกลับ</button>
+          <button class="primary" id="quizNextBtn" onclick="nextQuiz()">ถัดไป</button>
+        </div>
+      </section>
+
+      <section id="stepDecorate" class="panel step">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Step 2</p>
+            <h2>Decorate Your Mood Board</h2>
+            <p>เพิ่มสติกเกอร์ อีโมจิ รูปภาพ และข้อความ แล้วลาก / ย่อขยาย / ลบได้อิสระ</p>
+          </div>
+          <span class="progress" id="profileBadge">Mood Profile</span>
+        </div>
+
+        <div class="decorate-layout">
+          <div class="toolbox cute-card">
+            <div class="mini-tabs">
+              <button class="mini-tab active" data-tab="info" onclick="switchToolTab('info')">Info</button>
+              <button class="mini-tab" data-tab="decor" onclick="switchToolTab('decor')">Decor</button>
+              <button class="mini-tab" data-tab="text" onclick="switchToolTab('text')">Text</button>
+            </div>
+
+            <div class="tool-tab active" id="tool-info">
+              <label>ชื่อ / Nickname *</label>
+              <input id="nameInput" placeholder="เช่น Friendly" oninput="syncBoardText()">
+
+              <label>Employee ID * <span class="muted">(ใช้กันหมุนซ้ำ)</span></label>
+              <input id="employeeInput" inputmode="numeric" placeholder="เช่น 613363 หรือ EMP001">
+
+              <label>ทีม / แผนก</label>
+              <input id="teamInput" placeholder="เช่น CES / EHS / CAL-MED">
+
+              <label>คำให้กำลังใจวันนี้</label>
+              <textarea id="affirmInput" maxlength="180" placeholder="เช่น วันนี้ฉันไม่ต้องสมบูรณ์แบบ แค่ค่อย ๆ ดีขึ้นก็พอ" oninput="syncBoardText()"></textarea>
+            </div>
+
+            <div class="tool-tab" id="tool-decor">
+              <label>เลือก Mood Color</label>
+              <div class="swatches" id="swatches"></div>
+              <div class="color-picker-row">
+                <input id="customColorInput" type="color" value="#ffe1e7" aria-label="เลือกสีเอง">
+                <button class="ghost small" onclick="applyCustomMoodColor()">ใช้สีนี้</button>
+              </div>
+
+              <label>Sticker / Emoji</label>
+              <div class="stickers" id="stickerPalette"></div>
+
+              <label>เพิ่ม Emoji เอง</label>
+              <div class="inline-control">
+                <input id="customEmojiInput" placeholder="เช่น 🧸">
+                <button class="ghost" onclick="addCustomEmoji()">เพิ่ม</button>
+              </div>
+
+              <label>เพิ่มรูปภาพทำ Collage</label>
+              <input id="imageInput" type="file" accept="image/*" multiple onchange="handleImageUpload(event)">
+              <p class="hint">แนะนำไม่เกิน 3 รูป ระบบจะบีบอัดภาพเพื่อให้บันทึกเร็วขึ้น</p>
+            </div>
+
+            <div class="tool-tab" id="tool-text">
+              <label>เพิ่มข้อความตกแต่ง</label>
+              <div class="inline-control">
+                <input id="customTextInput" placeholder="เช่น You did well today">
+                <button class="ghost" onclick="addTextItem()">เพิ่ม</button>
+              </div>
+              <label>ขนาดตัวอักษร</label>
+              <input id="textSizeRange" type="range" min="14" max="46" value="24">
+
+              <label>สีข้อความ</label>
+              <div class="color-picker-row">
+                <input id="textColorInput" type="color" value="#2f4054" aria-label="เลือกสีข้อความ">
+                <button class="ghost small" onclick="matchTextColorToMood()">ใช้สีเดียวกับ Mood</button>
+              </div>
+              <div class="button-row dense">
+                <button class="ghost" onclick="removeSelectedItem()">ลบชิ้นที่เลือก</button>
+                <button class="ghost" onclick="clearBoardItems()">Reset Mood Board</button>
+              </div>
+            </div>
+
+            <div class="sticky-actions">
+              <button class="ghost reset-board-btn" onclick="clearBoardItems()">🧽 Reset Mood Board</button>
+              <button class="submit-board-btn" id="submitBoardBtn" onclick="prepareGacha()">💖 ส่ง Mood Board + ไปหมุน Gacha</button>
+            </div>
+          </div>
+
+          <div class="board-wrap">
+            <div id="cooldownCard" class="cooldown-card theme-0">
+              <div class="card-bg-deco deco-a">○</div>
+              <div class="card-bg-deco deco-b">✦</div>
+              <div class="card-topline">MY MOOD BOARD</div>
+              <h3 id="cardName">Your Name</h3>
+              <p id="cardProfile">Mood Profile</p>
+              <div id="boardCanvas" class="board-canvas" aria-label="Decorate board canvas"></div>
+              <p id="cardAffirm">วันนี้ฉันอนุญาตให้ตัวเองพักได้</p>
+            </div>
+            <div class="board-help">💡 แตะชิ้นงานเพื่อเลือก / ลากเพื่อขยับ / ↻ หมุน / ↘ ย่อขยาย / × ลบ / รูปภาพกด Crop เพื่อครอป</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="stepGacha" class="panel step">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Step 3</p>
+            <h2>Wellness Gacha</h2>
+            <p>ตอบ Evaluation สั้น ๆ แล้วระบบจะหมุนวงล้อให้ทันที</p>
+          </div>
+        </div>
+
+        <div class="gacha-layout">
+          <div class="spin-card cute-card">
+            <div class="pointer">▼</div>
+            <div id="wheel" class="wheel" aria-label="Wellness Gacha Wheel">
+              <span class="wheel-center">Wellness<br>Gacha<small id="wheelLeftText">60 left</small></span>
+            </div>
+            <div id="spinResult" class="result-box">พร้อมหมุนแล้ว ✨</div>
+            <button id="spinBtn" class="primary big" onclick="openEvaluationModal()">ประเมิน + หมุนวงล้อ</button>
+          </div>
+
+          <aside class="prize-panel cute-card">
+            <div class="section-head compact">
+              <div>
+                <p class="eyebrow">Prize Status</p>
+                <h3>รางวัลที่เหลือ</h3>
+              </div>
+              <button class="tiny-btn" onclick="loadPrizeStatus()">Refresh</button>
+            </div>
+            <div class="pool-stats" id="poolStats"></div>
+            <h3 class="recent-title">Recent Gacha</h3>
+            <div id="recentGachaList" class="recent-list"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="stepWall" class="panel step">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Step 4</p>
+            <h2>Mood Board Gallery</h2>
+            <p>รวม Mood Board ที่ส่งแล้ว แตะหัวใจเพื่อส่งกำลังใจให้กัน</p>
+          </div>
+          <button class="ghost" onclick="refreshWall()">Refresh Gallery</button>
+        </div>
+        <div id="wallBox" class="wall-grid padlet-grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="profileModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card cute-card profile-modal-card">
+      <button class="modal-close" onclick="closeProfileModal()" aria-label="Close">×</button>
+      <div id="profileModalContent"></div>
+    </div>
+  </div>
+
+  <div id="evaluationModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card cute-card">
+      <button class="modal-close" onclick="closeEvaluationModal()" aria-label="Close">×</button>
+      <p class="eyebrow">Last Step</p>
+      <h2>Evaluation ก่อนหมุน Gacha</h2>
+      <p>ตอบสั้น ๆ แล้ววงล้อจะเริ่มหมุนทันที</p>
+      <div class="eval-grid form-style">
+        <label>1. ความพึงพอใจโดยรวมต่อกิจกรรม <span class="required">*</span></label>
+        <div id="evalOverallStars" class="star-rating" aria-label="ให้คะแนนความพึงพอใจ">
+          <button type="button" onclick="setEvalOverall(1)">☆</button>
+          <button type="button" onclick="setEvalOverall(2)">☆</button>
+          <button type="button" onclick="setEvalOverall(3)">☆</button>
+          <button type="button" onclick="setEvalOverall(4)">☆</button>
+          <button type="button" onclick="setEvalOverall(5)">☆</button>
+        </div>
+        <input id="evalOverall" type="hidden" value="0">
+
+        <label>2. หลังจบกิจกรรมรู้สึกอย่างไร <span class="required">*</span><small>(เลือกได้มากกว่า 1 ข้อ)</small></label>
+        <div class="check-list" id="evalFeelings">
+          <label><input type="checkbox" value="ผ่อนคลาย"> 😊 ผ่อนคลาย</label>
+          <label><input type="checkbox" value="มีความสุข"> 😄 มีความสุข</label>
+          <label><input type="checkbox" value="ได้ใช้เวลากับตัวเอง"> 🧘 ได้ใช้เวลากับตัวเอง</label>
+          <label><input type="checkbox" value="ได้พูดคุยกับเพื่อนร่วมงาน"> 🤝 ได้พูดคุยกับเพื่อนร่วมงาน</label>
+          <label><input type="checkbox" value="เฉย ๆ"> 😐 เฉย ๆ</label>
+          <label class="other-inline"><input type="checkbox" value="Other"> Other <input id="evalFeelingOther" placeholder="ระบุเพิ่มเติม"></label>
+        </div>
+
+        <label>3. อยากให้มีกิจกรรมลักษณะนี้อีกหรือไม่ <span class="required">*</span></label>
+        <div class="radio-list" id="evalWantAgain">
+          <label><input type="radio" name="wantAgain" value="อยากมาก"> อยากมาก</label>
+          <label><input type="radio" name="wantAgain" value="อยาก"> อยาก</label>
+          <label><input type="radio" name="wantAgain" value="เฉยๆ"> เฉยๆ</label>
+          <label><input type="radio" name="wantAgain" value="ไม่ต้องมีก็ได้"> ไม่ต้องมีก็ได้</label>
+        </div>
+
+        <label>4. ข้อเสนอแนะเพิ่มเติม (ถ้ามี)</label>
+        <textarea id="evalComment" placeholder="Enter your answer"></textarea>
+      </div>
+      <div class="button-row end">
+        <button class="ghost" onclick="closeEvaluationModal()">กลับไปแก้ไข</button>
+        <button class="primary" onclick="submitEvaluationAndSpin()">ส่ง Evaluation + Spin</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="resultModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card result-modal cute-card">
+      <button class="modal-close" onclick="closeResultModal()" aria-label="Close">×</button>
+      <div id="resultModalContent"></div>
+    </div>
+  </div>
+
+  <div id="loadingOverlay" class="loading-backdrop hidden" role="status" aria-live="polite">
+    <div class="loading-card cute-card">
+      <div class="loader-heart">💗</div>
+      <strong id="loadingTitle">กำลังบันทึกข้อมูล</strong>
+      <p id="loadingText">กรุณารอสักครู่...</p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
