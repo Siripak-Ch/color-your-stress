@@ -1,33 +1,19 @@
-# Color Your Stress — V19 Gacha Once + Loading
+# Color Your Stress V20 — Gacha PrizePool Fixed
 
-ชุดนี้แก้จาก V17 โดยเน้นส่วน Gacha ตาม feedback ล่าสุด
+ชุดนี้แก้จาก V19 โดยเน้นแก้ระบบ Gacha ให้ตัดรางวัลจาก PrizePool จริง และซ่อมข้อมูลเก่าที่เคยมี GachaHistory/Participants แล้วแต่ PrizePool ยังไม่ถูก mark claimed.
 
-## สิ่งที่แก้ใน V19
-- หมุน Gacha ได้แค่ 1 ครั้งต่อ Employee ID
-- หลังหมุนสำเร็จ ปุ่มจะถูก disable เป็น “หมุนแล้ว”
-- Backend ยังล็อกซ้ำด้วย ParticipantKey/Employee ID เหมือนเดิม
-- ระหว่างรอผลรางวัลมี loading popup ชัดเจน
-- เมื่อสุ่มเสร็จจึงแสดง popup รางวัลทันที
-- Popup รางวัลปรับเป็นแบบ minimal อ่านง่ายขึ้น
-- Popup แสดงชื่อ / Employee ID / Team เพื่อระบุตัวตน
-- เพิ่มข้อความให้แคปหน้าจอและส่ง LINE ID: Friendly_dukdik หรือ Album LINE Customer Experience
-- ไม่มีระบบส่งเมล / MailApp / GmailApp / sendEmail
-- เพิ่ม cache busting v18 ใน index.html
-
-## วิธี Deploy
-1. อัป `index.html`, `styles.css`, `app.js`, `config.js`, `.nojekyll`, `.github` ขึ้น GitHub repo
-2. วาง `gas-backend/Code.gs` และ `gas-backend/appsscript.json` ใน Apps Script
+## ต้องทำหลังวางโค้ด
+1. วางไฟล์ GitHub: `index.html`, `styles.css`, `app.js`, `config.js`, `.nojekyll`, `.github/workflows/deploy-pages.yml`
+2. วาง Apps Script: `gas-backend/Code.gs`, `gas-backend/appsscript.json`
 3. Run `setupSheets`
 4. Run `authorizeServices`
-5. Deploy > Manage deployments > Edit > New version > Deploy
-6. นำ Web App URL ที่ลงท้าย `/exec` ไปใส่ใน `config.js`
-7. เปิดเว็บแบบ Incognito หรือ Ctrl+F5 เพื่อไม่ให้ cache เก่าค้าง
+5. Run `repairPrizePoolClaimsNow` 1 ครั้ง เพื่อซ่อม PrizePool จากข้อมูล GachaHistory/Participants เดิม
+6. Deploy > Manage deployments > Edit > New version > Deploy
+7. เปิดเว็บแบบ Incognito หรือ Ctrl+F5
 
-## หมายเหตุ
-ถ้ายังเห็น popup แบบเก่า ให้ตรวจว่า index.html โหลด `app.js?v=18` และ `config.js?v=18` แล้ว
-
-
-## V19 Update
-- แบบประเมินข้อ 2 เปลี่ยนจาก checkbox เป็น radio เลือกได้เพียง 1 ข้อ
-- ยังเก็บลง Sheet ในรูปแบบเดิม: `feelings` เป็น array ที่มี 1 ค่า เพื่อ compatible กับ backend เดิม
-- เพิ่ม cache busting เป็น `v=19`
+## สิ่งที่แก้ใน V20
+- `getPrizeStatus()` จะ repair PrizePool จาก Participants/GachaHistory ก่อนคำนวณจำนวนคงเหลือ
+- duplicate spin จะไม่ทำให้ count เพี้ยน และจะ mark PrizePool ของรางวัลเดิมเป็น Claimed ถ้ายังไม่ถูก mark
+- หลังหมุนสำเร็จ frontend force refresh prize status อีกครั้งหลัง backend flush
+- ถ้าโหลด prize status error จะไม่โชว์ fallback 60/30/30 ปลอมอีก
+- ไม่มีระบบส่งเมล

@@ -605,6 +605,8 @@ function startSpin(payload) {
     } else {
       loadPrizeStatus(false, true);
     }
+    // V20: force one fresh status reload after the backend has flushed PrizePool, so the count visibly drops immediately.
+    setTimeout(() => loadPrizeStatus(false, true), 650);
     refreshWall(false, true);
     const wait = Math.max(0, 650 - (Date.now() - startedAt));
     setTimeout(() => {
@@ -747,7 +749,9 @@ function loadPrizeStatus(showLoadingFlag = false, force = false) {
     renderPrizeStatus(res);
   }).catch(err => {
     console.warn('Prize status error:', err);
-    renderPrizeStatus({ ok: true, totalRemaining: 60, giftRemaining: 30, couponRemaining: 30, recent: [], offline: true });
+    const fallback = apiCache.prize.data || { ok: true, totalRemaining: 0, giftRemaining: 0, couponRemaining: 0, recent: [], offline: true };
+    renderPrizeStatus(fallback);
+    showToast('โหลดสถานะรางวัลไม่สำเร็จ กรุณากด Refresh อีกครั้ง');
   }).finally(() => { if (showLoadingFlag) hideLoading(); });
 }
 function renderPrizeStatus(res) {

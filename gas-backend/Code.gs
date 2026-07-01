@@ -1,5 +1,5 @@
 /*******************************************************
- * Color Your Stress V15 GACHA FAST MOBILE Backend
+ * Color Your Stress V20 GACHA PRIZEPOOL FIXED Backend
  * Google Apps Script + Google Sheets + Drive image upload
  * Deploy as Web App: Execute as Me, Access Anyone / Anyone within organization
  *******************************************************/
@@ -11,7 +11,7 @@
 const SPREADSHEET_ID = '1C7BMXfGIJMf0COVUmd5aWSk4Kn_K3GS-2uCTPvQqYHI'; // Google Sheet ID จริง
 const CREATE_NEW_SHEET_IF_EMPTY = true;
 const ADMIN_CONTACT_NOTE = 'Popup only - participant contacts staff after screenshot';
-const SETUP_VERSION = 'COLOR_STRESS_V15_GACHA_FAST_MOBILE_2026_07_01';
+const SETUP_VERSION = 'COLOR_STRESS_V20_GACHA_PRIZEPOOL_FIXED_2026_07_01';
 
 const APP = {
   TITLE: 'Color Your Stress | Wellness Gacha',
@@ -264,6 +264,9 @@ function getPrizeStatus() {
 }
 
 function getPrizeStatusFast_(ss) {
+  // V20: repair PrizePool first so Available/Gifts/Coupons always matches GachaHistory/Participants.
+  // This fixes cases where old deployed code wrote GachaHistory but did not mark PrizePool as Claimed.
+  reconcilePrizePoolClaims_(ss);
   const pool = getDataRows_(ss.getSheetByName(APP.SHEETS.POOL));
   const history = getDataRows_(ss.getSheetByName(APP.SHEETS.GACHA));
   const available = pool.filter(r => !isClaimed_(r));
@@ -370,6 +373,10 @@ function spinGacha(payload) {
 
     if (existingRow > 0) {
       const existing = getRowObject_(participantsSheet, existingRow);
+      // V20: if this participant already has a prize from an earlier run, make sure PrizePool row is also marked claimed.
+      if (existing.PrizeID) {
+        markPrizeClaimedById_(ss, existing.PrizeID, existing.ParticipantKey || data.participantKey, existing.Name || data.name, existing.CardID || data.cardId, now_());
+      }
       const status = getPrizeStatusFast_(ss);
       return {
         ok: true,
@@ -393,6 +400,8 @@ function spinGacha(payload) {
     const now = now_();
     const cardId = resolveCardIdForSpin_(ss, data);
     const prize = claimRandomPrizeFast_(ss, data.participantKey, data.name, cardId);
+    // Force pending PrizePool update to apply before status is calculated and returned to the frontend.
+    SpreadsheetApp.flush();
 
     appendObjectRow_(participantsSheet, {
       Timestamp: now,
@@ -578,6 +587,91 @@ function isClaimedObj_(row, headers) {
 function sendGiftEmail_(data, prize, cardId) {
   // V11 intentionally disabled: showing prize popup only prevents Apps Script timeout and removes extra authorization.
   log_('GIFT_POPUP_ONLY', (data && data.employeeId || '') + ' => ' + (prize && prize.name || ''));
+}
+
+
+/*********************** V20 PRIZEPOOL REPAIR ************************/
+
+function reconcilePrizePoolClaims_(ss) {
+  // Idempotent repair: mark PrizePool as claimed for every PrizeID already present in Participants/GachaHistory.
+  // Safe to run repeatedly; it only writes rows that are still Available.
+  try {
+    const poolSheet = ss.getSheetByName(APP.SHEETS.POOL);
+    if (!poolSheet || poolSheet.getLastRow() < 2) return { ok: true, repaired: 0 };
+
+    const claimedMap = {};
+    const participants = getDataRows_(ss.getSheetByName(APP.SHEETS.PARTICIPANTS));
+    participants.forEach(r => {
+      const prizeId = String(r.PrizeID || '').trim();
+      if (prizeId && prizeId !== 'WAITLIST') {
+        claimedMap[prizeId] = {
+          participantKey: r.ParticipantKey || '',
+          participantName: r.Name || '',
+          cardId: r.CardID || '',
+          claimedAt: r.Timestamp || now_()
+        };
+      }
+    });
+
+    const history = getDataRows_(ss.getSheetByName(APP.SHEETS.GACHA));
+    history.forEach(r => {
+      const prizeId = String(r.PrizeID || '').trim();
+      if (prizeId && prizeId !== 'WAITLIST' && String(r.IsDuplicate).toUpperCase() !== 'TRUE') {
+        claimedMap[prizeId] = {
+          participantKey: r.ParticipantKey || claimedMap[prizeId]?.participantKey || '',
+          participantName: r.ParticipantName || claimedMap[prizeId]?.participantName || '',
+          cardId: r.CardID || claimedMap[prizeId]?.cardId || '',
+          claimedAt: r.Timestamp || claimedMap[prizeId]?.claimedAt || now_()
+        };
+      }
+    });
+
+    let repaired = 0;
+    Object.keys(claimedMap).forEach(prizeId => {
+      const info = claimedMap[prizeId];
+      if (markPrizeClaimedById_(ss, prizeId, info.participantKey, info.participantName, info.cardId, info.claimedAt)) repaired++;
+    });
+    if (repaired > 0) {
+      SpreadsheetApp.flush();
+      log_('REPAIR_PRIZEPOOL_CLAIMS', 'Repaired claimed PrizePool rows: ' + repaired);
+    }
+    return { ok: true, repaired };
+  } catch (err) {
+    log_('REPAIR_PRIZEPOOL_ERROR', err.stack || err.message || String(err));
+    return { ok: false, message: err.message || String(err) };
+  }
+}
+
+function markPrizeClaimedById_(ss, prizeId, participantKey, participantName, cardId, claimedAt) {
+  const sh = ss.getSheetByName(APP.SHEETS.POOL);
+  if (!sh || sh.getLastRow() < 2 || !prizeId) return false;
+  const headers = getHeaders_(sh);
+  const colPrize = headers.indexOf('PrizeID') + 1;
+  if (colPrize < 1) return false;
+  const values = sh.getRange(2, colPrize, sh.getLastRow() - 1, 1).getValues().flat();
+  for (let i = 0; i < values.length; i++) {
+    if (String(values[i]).trim() === String(prizeId).trim()) {
+      const rowNumber = i + 2;
+      const row = getRowObject_(sh, rowNumber);
+      if (isClaimed_(row)) return false;
+      const updates = {
+        Status: 'Claimed',
+        Claimed: true,
+        ClaimedAt: claimedAt || now_(),
+        ParticipantKey: participantKey || row.ParticipantKey || '',
+        ParticipantName: participantName || row.ParticipantName || '',
+        CardID: cardId || row.CardID || ''
+      };
+      setRowObject_(sh, rowNumber, updates);
+      return true;
+    }
+  }
+  return false;
+}
+
+function repairPrizePoolClaimsNow() {
+  ensureSetup_();
+  return reconcilePrizePoolClaims_(getSpreadsheet_());
 }
 
 /*********************** IMAGE UPLOAD ************************/
