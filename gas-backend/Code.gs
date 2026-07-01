@@ -11,7 +11,7 @@
 const SPREADSHEET_ID = '1C7BMXfGIJMf0COVUmd5aWSk4Kn_K3GS-2uCTPvQqYHI'; // Google Sheet ID จริง
 const CREATE_NEW_SHEET_IF_EMPTY = true;
 const ADMIN_CONTACT_NOTE = 'Popup only - participant contacts staff after screenshot';
-const SETUP_VERSION = 'COLOR_STRESS_V20_GACHA_PRIZEPOOL_FIXED_2026_07_01';
+const SETUP_VERSION = 'COLOR_STRESS_V21_RESET_ALL_FIXED_2026_07_01';
 
 const APP = {
   TITLE: 'Color Your Stress | Wellness Gacha',
@@ -43,6 +43,7 @@ function onOpen() {
       .addItem('Setup / Repair Sheets', 'setupSheets')
       .addItem('Open Web App Info', 'showWebAppInfo')
       .addSeparator()
+      .addItem('RESET ALL data + PrizePool', 'resetAllData_CONFIRM')
       .addItem('RESET Prize Pool only', 'resetPrizePool_CONFIRM')
       .addToUi();
   } catch (err) { console.log(err); }
@@ -97,6 +98,8 @@ function routeJSONP_(e) {
       case 'likeCard':
       case 'voteCard': result = likeCard(payload); break;
       case 'getAdminSummary': result = getAdminSummary(); break;
+      case 'resetAllData': result = resetAllDataForNewRound(); break;
+      case 'resetPrizePool': result = resetPrizePoolOnly(); break;
       default: result = { ok: false, message: 'Unknown action: ' + actionRaw + ' (normalized: ' + action + ')' };
     }
     return jsonpOutput_(callback, result);
@@ -131,7 +134,12 @@ function normalizeAction_(action) {
     'getadminsummary': 'getAdminSummary',
     'setup': 'setupSheets',
     'setupsheets': 'setupSheets',
-    'authorizeservices': 'authorizeServices'
+    'authorizeservices': 'authorizeServices',
+    'resetalldata': 'resetAllData',
+    'reset_all_data': 'resetAllData',
+    'resetall': 'resetAllData',
+    'resetprizepool': 'resetPrizePool',
+    'reset_prize_pool': 'resetPrizePool'
   };
   return map[lower] || a;
 }
@@ -240,10 +248,108 @@ function buildPrizePool_() {
   return rows;
 }
 function resetPrizePool_CONFIRM() {
-  const ss = getSpreadsheet_(); const sh = ss.getSheetByName(APP.SHEETS.POOL);
-  sh.clear(); sh.getRange(1, 1, 1, 13).setValues([['PrizeID', 'RollNo', 'Type', 'PrizeName', 'BudgetTHB', 'IsCash', 'Status', 'Claimed', 'ClaimedAt', 'ParticipantKey', 'ParticipantName', 'CardID', 'Note']]);
-  fillPrizePoolIfBlank_(sh); applyBasicFormatting_(ss); log_('RESET_PRIZE_POOL', 'Prize pool reset to 60 slots');
-  return { ok: true, message: 'Prize pool reset to 60 slots' };
+  try {
+    const ui = SpreadsheetApp.getUi();
+    const res = ui.alert(
+      'RESET Prize Pool only',
+      'ต้องการ reset เฉพาะรางวัลให้กลับมา 60 slots ใช่หรือไม่?\nข้อมูลผู้เล่น / Gallery / Evaluation จะไม่ถูกล้าง',
+      ui.ButtonSet.YES_NO
+    );
+    if (res !== ui.Button.YES) return { ok: false, message: 'Cancelled' };
+  } catch (err) {}
+  return resetPrizePoolOnly();
+}
+
+function resetPrizePoolOnly() {
+  const ss = getSpreadsheet_();
+  resetPrizePool_(ss);
+  applyBasicFormatting_(ss);
+  log_('RESET_PRIZE_POOL', 'Prize pool reset to 60 slots');
+  return { ok: true, message: 'Prize pool reset to 60 slots', spreadsheetUrl: ss.getUrl() };
+}
+
+function resetPrizePool_(ss) {
+  let sh = ss.getSheetByName(APP.SHEETS.POOL);
+  if (!sh) sh = ss.insertSheet(APP.SHEETS.POOL);
+  sh.clear();
+  sh.getRange(1, 1, 1, 13).setValues([['PrizeID', 'RollNo', 'Type', 'PrizeName', 'BudgetTHB', 'IsCash', 'Status', 'Claimed', 'ClaimedAt', 'ParticipantKey', 'ParticipantName', 'CardID', 'Note']]);
+  const rows = buildPrizePool_();
+  sh.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  sh.setFrozenRows(1);
+}
+
+function resetAllData_CONFIRM() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    const res = ui.alert(
+      'RESET ALL data + PrizePool',
+      'คำสั่งนี้จะล้างข้อมูลกิจกรรมทั้งหมดใน Sheet: Participants, QuizAnswers, Cards, GachaHistory, Evaluations, Likes, Votes, Logs และ reset PrizePool กลับเป็น 60 slots\n\nยืนยันทำต่อหรือไม่?',
+      ui.ButtonSet.YES_NO
+    );
+    if (res !== ui.Button.YES) return { ok: false, message: 'Cancelled' };
+  } catch (err) {}
+  return resetAllDataForNewRound();
+}
+
+function resetAllDataForNewRound() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const ss = getSpreadsheet_();
+    setupSheets();
+
+    // ล้างข้อมูลที่ sync กับหน้าเว็บ โดยเก็บ header ไว้
+    const sheetsToClear = [
+      APP.SHEETS.PARTICIPANTS,
+      APP.SHEETS.QUIZ,
+      APP.SHEETS.CARDS,
+      APP.SHEETS.GACHA,
+      APP.SHEETS.EVAL,
+      APP.SHEETS.LIKES,
+      'Votes',
+      APP.SHEETS.LOGS,
+      'Log'
+    ];
+
+    sheetsToClear.forEach(function(name) {
+      const sh = ss.getSheetByName(name);
+      if (!sh) return;
+      clearSheetDataKeepHeader_(sh);
+    });
+
+    // reset รางวัลกลับเป็น 60 slots ใหม่ทั้งหมด
+    resetPrizePool_(ss);
+
+    // clear cache ที่อาจทำให้เว็บยังเห็นข้อมูลเก่า
+    clearAppCache_();
+
+    applyBasicFormatting_(ss);
+    const logs = ss.getSheetByName(APP.SHEETS.LOGS);
+    if (logs) logs.appendRow([now_(), 'RESET_ALL_DATA', 'All web synced data cleared. PrizePool reset to 60 slots.']);
+
+    return {
+      ok: true,
+      message: 'Reset all data completed. Web can sync fresh data now.',
+      spreadsheetUrl: ss.getUrl()
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function clearSheetDataKeepHeader_(sh) {
+  const lastRow = sh.getLastRow();
+  const lastCol = sh.getLastColumn();
+  if (lastRow > 1 && lastCol > 0) {
+    sh.getRange(2, 1, lastRow - 1, lastCol).clearContent();
+  }
+}
+
+function clearAppCache_() {
+  try {
+    const cache = CacheService.getScriptCache();
+    cache.removeAll(['prizeStatus', 'wall', 'gachaHistory', 'adminSummary']);
+  } catch (err) {}
 }
 
 

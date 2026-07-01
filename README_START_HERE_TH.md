@@ -1,19 +1,30 @@
-# Color Your Stress V20 — Gacha PrizePool Fixed
+# Color Your Stress V21 — RESET ALL DATA FIXED
 
-ชุดนี้แก้จาก V19 โดยเน้นแก้ระบบ Gacha ให้ตัดรางวัลจาก PrizePool จริง และซ่อมข้อมูลเก่าที่เคยมี GachaHistory/Participants แล้วแต่ PrizePool ยังไม่ถูก mark claimed.
+เวอร์ชันนี้เพิ่มเมนูใน Google Sheet ครบแล้ว:
 
-## ต้องทำหลังวางโค้ด
-1. วางไฟล์ GitHub: `index.html`, `styles.css`, `app.js`, `config.js`, `.nojekyll`, `.github/workflows/deploy-pages.yml`
-2. วาง Apps Script: `gas-backend/Code.gs`, `gas-backend/appsscript.json`
-3. Run `setupSheets`
-4. Run `authorizeServices`
-5. Run `repairPrizePoolClaimsNow` 1 ครั้ง เพื่อซ่อม PrizePool จากข้อมูล GachaHistory/Participants เดิม
-6. Deploy > Manage deployments > Edit > New version > Deploy
-7. เปิดเว็บแบบ Incognito หรือ Ctrl+F5
+- `RESET ALL data + PrizePool` = ล้างข้อมูลกิจกรรมทั้งหมดและ reset รางวัลกลับ 60 slots
+- `RESET Prize Pool only` = reset เฉพาะรางวัล ไม่ล้างข้อมูลผู้เล่น/Gallery
 
-## สิ่งที่แก้ใน V20
-- `getPrizeStatus()` จะ repair PrizePool จาก Participants/GachaHistory ก่อนคำนวณจำนวนคงเหลือ
-- duplicate spin จะไม่ทำให้ count เพี้ยน และจะ mark PrizePool ของรางวัลเดิมเป็น Claimed ถ้ายังไม่ถูก mark
-- หลังหมุนสำเร็จ frontend force refresh prize status อีกครั้งหลัง backend flush
-- ถ้าโหลด prize status error จะไม่โชว์ fallback 60/30/30 ปลอมอีก
-- ไม่มีระบบส่งเมล
+## วิธีใช้หลังอัป Code.gs ใหม่
+
+1. เปิด Apps Script แล้ววาง `gas-backend/Code.gs` ใหม่
+2. Save
+3. Run `setupSheets` 1 ครั้ง
+4. Reload Google Sheet tab
+5. จะเห็นเมนู `🎨 Color Stress`
+6. เลือก `RESET ALL data + PrizePool`
+7. กลับไปหน้าเว็บแล้วกด Refresh / Ctrl+F5
+
+## ข้อมูลที่จะถูกล้างเมื่อกด RESET ALL
+
+- Participants
+- QuizAnswers
+- Cards
+- GachaHistory
+- Evaluations
+- Likes
+- Votes
+- Logs / Log
+- PrizePool จะถูกสร้างใหม่เป็น 60 slots ทั้งหมด
+
+ระบบยังคงฟังก์ชันเดิมทั้งหมดจาก V20 และไม่มีระบบส่งอีเมล
