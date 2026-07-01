@@ -1,19 +1,7 @@
-Color Your Stress V12 Rechecked Full - Local static validation
+V15 Recheck Report
 
-Source base: user-uploaded color_your_stress_FULL_FUNCTION_V12_Github_GAS(1).zip
-Main approach: preserve V12 structure and full Code.gs backend. Do not replace with shortened final backend.
-
-Fixes applied:
-1) Added missing switchToolTab(tab) function in app.js.
-2) Rechecked all inline onclick/oninput/onchange handlers in index.html: all have matching functions in app.js.
-3) Rechecked app.js syntax using node --check: passed.
-4) Rechecked Code.gs syntax by checking as JavaScript: passed.
-5) Kept full backend Code.gs length around 516 lines, with Google Sheet ID included.
-6) Active email sending remains removed. No email service calls references remain.
-7) Added .github/workflows/deploy-pages.yml for GitHub Pages Actions deploy.
-8) Kept .nojekyll.
-
-Manual live checks still required after deploy:
-- Apps Script Web App permission and /exec URL.
-- Run setupSheets and authorizeServices under the owner Google account.
-- Deploy Apps Script as New version after Code.gs changes.
+App.js syntax: PASS (node --check)
+Code.gs syntax: PASS (node --check as JS)
+Missing inline functions: []
+Mail/Gmail references active: []
+Source: V14/V12 full backend retained, gacha duplicate const fixed, gacha UI speed/mobility patched.
