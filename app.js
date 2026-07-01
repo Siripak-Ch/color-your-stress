@@ -544,24 +544,37 @@ function submitEvaluationAndSpin() {
 function startSpin(payload) {
   const spinBtn = document.getElementById('spinBtn');
   const wheel = document.getElementById('wheel');
-  spinBtn.disabled = true;
-  spinBtn.textContent = 'กำลังสุ่ม...';
-  document.getElementById('spinResult').innerHTML = '<strong>กำลังหมุนวงล้อ...</strong><small>ระบบกำลังบันทึก Evaluation และสุ่มรางวัล</small>';
-  wheel.style.transition = 'none';
-  wheel.style.transform = 'rotate(0deg)';
-  requestAnimationFrame(() => {
-    wheel.style.transition = 'transform .95s cubic-bezier(.18,.9,.18,1)';
-    wheel.style.transform = `rotate(${900 + Math.floor(Math.random() * 540)}deg)`;
-  });
+  const resultBox = document.getElementById('spinResult');
+  if (!payload) return showToast('ไม่พบข้อมูลสำหรับหมุน Gacha');
 
-  api('submitAndSpin', payload, { timeout: 22000 }).then(res => {
+  const spinPayload = buildSpinPayload(payload);
+  if (spinBtn) {
+    spinBtn.disabled = true;
+    spinBtn.textContent = 'กำลังสุ่ม...';
+  }
+  if (resultBox) {
+    resultBox.innerHTML = '<strong>กำลังสุ่มรางวัล...</strong><small>รอสักครู่ ระบบกำลังล็อกรางวัลจาก PrizePool</small>';
+  }
+
+  const finalRotation = 720 + Math.floor(Math.random() * 360);
+  if (wheel) {
+    wheel.classList.add('is-spinning');
+    wheel.style.transition = 'none';
+    wheel.style.transform = 'rotate(0deg)';
+    requestAnimationFrame(() => {
+      wheel.style.transition = 'transform .55s cubic-bezier(.16,.9,.18,1)';
+      wheel.style.transform = `rotate(${finalRotation}deg)`;
+    });
+  }
+
+  // Fast path: only send small payload to Apps Script. No board image / no layout JSON here.
+  const startedAt = Date.now();
+  api('spinGacha', spinPayload, { timeout: 12000 }).then(res => {
     if (!res || !res.ok) throw new Error((res && res.message) || 'ไม่สามารถสุ่มรางวัลได้');
     lastSpinResponse = res;
-    if (res.cardId && payload.cardId && res.cardId !== payload.cardId) replaceLocalCardId(payload.cardId, res.cardId);
-    if (res.cardId) payload.cardId = res.cardId;
-    if (lastBoardImage && res.cardId && uploadedImageForCardId !== res.cardId && isLiveMode() && config().SAVE_BOARD_IMAGE_TO_DRIVE !== false) {
-      uploadedImageForCardId = res.cardId;
-      uploadBoardImageNoCors(res.cardId, payload.employeeId || payload.emailOrId, lastBoardImage, window.__lastBoardThumb || lastBoardImage);
+    if (res.cardId) {
+      preparedPayload.cardId = res.cardId;
+      spinPayload.cardId = res.cardId;
     }
     if (res.prizeStatus) {
       apiCache.prize = { ts: Date.now(), data: res.prizeStatus };
@@ -570,14 +583,47 @@ function startSpin(payload) {
       loadPrizeStatus(false, true);
     }
     refreshWall(false, true);
-    setTimeout(() => { renderSpinResult(res); }, 380);
+    const wait = Math.max(0, 520 - (Date.now() - startedAt));
+    setTimeout(() => renderSpinResult(res), wait);
   }).catch(err => {
-    document.getElementById('spinResult').innerHTML = '<strong>เกิดข้อผิดพลาด</strong><small>กรุณากด Refresh แล้วลองใหม่ หรือตรวจ Apps Script URL</small>';
-    showToast(err.message || String(err));
+    console.warn('Gacha spin error:', err);
+    if (resultBox) {
+      resultBox.innerHTML = '<strong>เกิดข้อผิดพลาด</strong><small>กรุณากด Refresh แล้วลองใหม่ หรือเช็กว่า Apps Script URL เป็น /exec และ Deploy เป็น New version แล้ว</small>';
+    }
+    showToast(err.message || 'Gacha error');
   }).finally(() => {
-    spinBtn.disabled = false;
-    spinBtn.textContent = 'ประเมิน + หมุนวงล้อ';
+    setTimeout(() => {
+      if (wheel) wheel.classList.remove('is-spinning');
+      if (spinBtn) {
+        spinBtn.disabled = false;
+        spinBtn.textContent = 'ประเมิน + หมุนวงล้อ';
+      }
+    }, 560);
   });
+}
+
+function buildSpinPayload(payload) {
+  const p = payload || preparedPayload || {};
+  const evaluation = p.evaluation || {};
+  return {
+    cardId: String(p.cardId || '').slice(0, 80),
+    name: String(p.name || document.getElementById('nameInput')?.value || '').trim().slice(0, 80),
+    employeeId: String(p.employeeId || p.emailOrId || document.getElementById('employeeInput')?.value || '').trim().slice(0, 160),
+    emailOrId: String(p.employeeId || p.emailOrId || document.getElementById('employeeInput')?.value || '').trim().slice(0, 160),
+    team: String(p.team || document.getElementById('teamInput')?.value || '').trim().slice(0, 100),
+    profileKey: String(p.profileKey || getProfile().key || 'calm'),
+    profileName: String(p.profileName || getProfile().label || ''),
+    profileShort: String(p.profileShort || getProfile().short || ''),
+    affirmation: String(p.affirmation || document.getElementById('affirmInput')?.value || '').trim().slice(0, 220),
+    scores: p.scores || getProfile().scores || {},
+    evaluation: {
+      overallRating: evaluation.overallRating || '',
+      feelings: Array.isArray(evaluation.feelings) ? evaluation.feelings.slice(0, 8) : [],
+      wantAgain: evaluation.wantAgain || '',
+      comment: String(evaluation.comment || '').slice(0, 500)
+    },
+    userAgent: navigator.userAgent.slice(0, 400)
+  };
 }
 function renderSpinResult(res) {
   const cfg = config();
@@ -585,29 +631,32 @@ function renderSpinResult(res) {
   const isGift = /gift|gacha/i.test(prize.type || '') || Number(prize.budget || 0) > 0;
   const typeLabel = isGift ? 'Gacha Gift' : 'Wellness Coupon';
   const prizeName = prize.name || typeLabel;
-  const claim = isGift
-    ? `<div class=\"claim-box compact-claim\">🎁 กรุณาแคปหน้าจอนี้ และติดต่อเจ้าหน้าที่เพื่อรับของรางวัล<br>LINE ID: <strong>${escapeHtml(cfg.CONTACT_LINE_ID || 'friendly_dukdik')}</strong><br>MS Teams: <strong>${escapeHtml(cfg.CONTACT_MS_TEAM || 'Siripak Chattanupakorn')}</strong></div>`
-    : `<div class=\"claim-box compact-claim\">🌿 เก็บ Wellness Coupon นี้ไว้เป็น reminder ให้ตัวเองพักใจได้วันนี้</div>`;
+  const lineId = cfg.CONTACT_LINE_ID || 'Friendly_dukdik';
+  const claimText = `กรุณาแคปหน้าจอนี้ แล้วส่งมาหาทีมงาน LINE ID: ${lineId} หรือใส่ใน Album ของ LINE Customer Experience เพื่อรับ/บันทึกรางวัล`;
 
   document.getElementById('spinResult').innerHTML = `
     <p>${res.duplicate ? 'คุณเคยหมุนแล้ว ระบบแสดงผลเดิม' : 'ผล Wellness Gacha ของคุณคือ'}</p>
     <strong>${escapeHtml(prizeName)}</strong>
     <small>${escapeHtml(typeLabel)}</small>
-    <button class=\"ghost small\" onclick=\"goStep('stepWall')\">ดู Mood Board Gallery</button>`;
+    <button class="ghost small" onclick="goStep('stepWall')">ดู Mood Board Gallery</button>`;
 
   const modal = document.getElementById('resultModal');
   const content = document.getElementById('resultModalContent');
   if (modal && content) {
     content.innerHTML = `
-      <div class=\"result-badge\">${isGift ? '🎁' : '💗'}</div>
-      <p class=\"eyebrow\">Gacha Result</p>
+      <div class="result-sparkles">✨ 🌈 💗</div>
+      <div class="result-badge cute-result-badge">${isGift ? '🎁' : '💗'}</div>
+      <p class="eyebrow">Gacha Result</p>
       <h2>${res.duplicate ? 'คุณเคยได้รับรางวัลนี้แล้ว' : 'ยินดีด้วย!'}</h2>
-      <div class=\"result-prize-name\">${escapeHtml(prizeName)}</div>
-      <p class=\"result-type-pill\">${escapeHtml(typeLabel)}</p>
-      ${claim}
-      <div class=\"button-row center\">
-        <button class=\"primary\" onclick=\"closeResultModal(); goStep('stepWall')\">ดู Mood Board Gallery</button>
-        <button class=\"ghost\" onclick=\"closeResultModal()\">ปิด</button>
+      <div class="result-prize-name">${escapeHtml(prizeName)}</div>
+      <p class="result-type-pill">${escapeHtml(typeLabel)}</p>
+      <div class="claim-box compact-claim">
+        <strong>📸 แคปหน้าจอนี้ไว้</strong><br>
+        ${escapeHtml(claimText)}
+      </div>
+      <div class="button-row center">
+        <button class="primary" onclick="closeResultModal(); goStep('stepWall')">ดู Mood Board Gallery</button>
+        <button class="ghost" onclick="closeResultModal()">ปิด</button>
       </div>`;
     modal.classList.remove('hidden');
   }
